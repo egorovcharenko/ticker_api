@@ -1,0 +1,9 @@
+version: "3"
+services:
+  poller:
+    build:
+      ticker-poller/.
+#    volumes:
+#      - .:/code
+  mongodb:
+    image: mongo:jessie
