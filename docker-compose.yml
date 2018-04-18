@@ -1,10 +1,10 @@
 version: "3"
 services:
-#  poller:
-#    build:
-#      ticker-poller/.
-#    volumes:
-#      - .:/code
+  poller:
+    build:
+      ticker-poller/.
+    volumes:
+      - ./ticker-poller/code:/code
   mongodb:
     image: mongo:jessie
   api:

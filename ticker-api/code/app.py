@@ -1,9 +1,9 @@
+import datetime
 import logging
 import time
 
 import pymongo
 from apistar import Include, Route
-from apistar.components import schema
 from apistar.frameworks.wsgi import WSGIApp as App
 from apistar.handlers import docs_urls, static_urls
 from pymongo.errors import ConnectionFailure
@@ -12,8 +12,10 @@ from pymongo.errors import ConnectionFailure
 class MyApiApp(App):
     """Класс АПИ с возможностью доступа к нашей БД"""
 
-    def __init__(self, db_layer, **kwargs):
+    def __init__(self, **kwargs):
+        db_layer = DatabaseLayer('mongodb')
         self.db_layer = db_layer
+
         super().__init__(**kwargs)
 
 
@@ -26,7 +28,6 @@ class DatabaseLayer:
 
         # ожидаем подключения к БД - без этого продолжать нет смысла
         self.client = pymongo.MongoClient(db_connection)
-        return
         while True:
             try:
                 self.client.admin.command('ismaster')
@@ -40,17 +41,40 @@ class DatabaseLayer:
 
 
 def get_ticker(pair: str = None):
-    """Получить средне значение курса валютной пары за прошедшие 10 минут"""
-    return {'message': pair}
+    """Получить среднее значение курса валютной пары за прошедшие 10 минут"""
+    try:
+        # проверяем, есть ли такая пара в БД
+        if not pair in app.db_layer.db_pairs.collection_names():
+            return {
+                'error': 1,
+                'message': f'Нет данных для такой пары: {pair}'
+            }
+        now = datetime.datetime.utcnow()
+        time_condition = {'$gte': now + datetime.timedelta(minutes=-10), '$lt': now}
+        average = app.db_layer.db_pairs[pair].aggregate([
+            {"$match": {"time": time_condition}},
+            {"$group": {"_id": None, "average_price": {"$avg": "$value"}}}
+        ])
+        average_num = list(average)[0]['average_price']
+        return {
+            'error': 0,
+            'pair': pair,
+            'average': str(average_num),
+            'raw_data': [price['value'] for price in app.db_layer.db_pairs[pair].find({"time": time_condition})],
+        }
+    except Exception as ex:
+        return {
+            'error': 1,
+            'message': f'Ошибка при получении курса для пары {pair}: {ex}'
+        }
 
 
-db_layer = DatabaseLayer('mongodb')
 routes = [
     Include('/docs', docs_urls),
     Route('/ticker', 'GET', get_ticker),
     Include('/static', static_urls)
 ]
-app = MyApiApp(db_layer=db_layer, routes=routes)
+app = MyApiApp(routes=routes)
 
 if __name__ == '__main__':
     app.main()

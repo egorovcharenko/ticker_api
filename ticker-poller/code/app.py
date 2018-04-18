@@ -1,15 +1,12 @@
-import datetime
-import time
-from pprint import pprint
-
-import sys
-import requests
 import asyncio
+import datetime
 import logging
+import sys
+import time
 
 import aiohttp
-
 import pymongo
+import requests
 from pymongo.errors import ConnectionFailure
 
 
@@ -85,9 +82,9 @@ class TickerPoller:
                 async with session.get(self.exchange_api + 'ticker/' + pairs_string) as response:
                     result = await response.json()
                     for pair, values in result.items():
-                        data_to_write = {'time': datetime.datetime.now(),
+                        data_to_write = {'time': datetime.datetime.utcnow(),
                                          'value': float(values['last'])}
-                        logging.debug(data_to_write)
+                        # logging.debug(f"Получили данные по паре: {pair}, {data_to_write}")
                         self.db_pairs[pair].insert_one(data_to_write)
             logging.debug('Получили данные по парам')
 
@@ -96,6 +93,6 @@ class TickerPoller:
 
 
 if __name__ == "__main__":
-    # Запустить опрос
-    poller = TickerPoller('https://wex.nz/api/3/', db_connection='localhost')
+    # Запустить опрос биржы
+    poller = TickerPoller('https://wex.nz/api/3/', db_connection='mongodb')
     poller.start_polling()
