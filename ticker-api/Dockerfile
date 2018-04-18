@@ -7,4 +7,4 @@ RUN pip3 install -U pip \
 
 WORKDIR /code/
 
-CMD ["apistar", "run", "--port", "8080"]
+CMD ["apistar", "run", "--host", "0.0.0.0", "--port", "80"]
