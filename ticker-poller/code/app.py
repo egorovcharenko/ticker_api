@@ -89,13 +89,13 @@ class TickerPoller:
                                          'value': float(values['last'])}
                         logging.debug(data_to_write)
                         self.db_pairs[pair].insert_one(data_to_write)
-
-            # Биржа кеширует данные 2 секунды, чаще опрашивать смысла нет
             logging.debug('Получили данные по парам')
-            await asyncio.sleep(2)
+
+            # Биржа кеширует данные, часто опрашивать смысла нет
+            await asyncio.sleep(self.polling_interval)
 
 
 if __name__ == "__main__":
     # Запустить опрос
-    poller = TickerPoller('https://wex.nz/api/3/', db_connection='mongodb')
+    poller = TickerPoller('https://wex.nz/api/3/', db_connection='localhost')
     poller.start_polling()

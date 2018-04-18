@@ -1,5 +1,5 @@
 FROM python:alpine
-ADD . code
+ADD . .
 WORKDIR code
-RUN pip install -r code/requirements.txt
-CMD ["python", "code/app.py"]
+RUN pip install -r requirements.txt
+CMD ["python", "app.py"]

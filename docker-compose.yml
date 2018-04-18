@@ -1,9 +1,16 @@
 version: "3"
 services:
-  poller:
-    build:
-      ticker-poller/.
+#  poller:
+#    build:
+#      ticker-poller/.
 #    volumes:
 #      - .:/code
   mongodb:
     image: mongo:jessie
+  api:
+    build:
+      ticker-api/.
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./ticker-api/code:/code
