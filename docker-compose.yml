@@ -11,6 +11,6 @@ services:
     build:
       ticker-api/.
     ports:
-      - "8888:80"
+      - "8888:8080"
     volumes:
       - ./ticker-api/code:/code

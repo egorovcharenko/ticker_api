@@ -3,20 +3,8 @@ import logging
 import time
 
 import pymongo
-from apistar import Include, Route, http, Response
-from apistar.frameworks.wsgi import WSGIApp as App
-from apistar.handlers import docs_urls, static_urls
+from aiohttp import web
 from pymongo.errors import ConnectionFailure
-
-
-class MyApiApp(App):
-    """Класс АПИ с возможностью доступа к нашей БД"""
-
-    def __init__(self, **kwargs):
-        db_layer = DatabaseLayer('mongodb', database_name='pairs')
-        self.db_layer = db_layer
-
-        super().__init__(**kwargs)
 
 
 class DatabaseLayer:
@@ -44,38 +32,37 @@ class DatabaseLayer:
         self.db_pairs = self.client[database_name]
 
 
-def get_ticker(pair: str = None) -> Response:
+async def get_ticker(request):
     """Получить среднее значение курса валютной пары за прошедшие 10 минут"""
     try:
+        pair = request.match_info.get('pair', "")
         now = datetime.datetime.utcnow()
-        if (not app.db_layer.all_pairs_cached_time) or (app.db_layer.all_pairs_cached_time + datetime.timedelta(
-                minutes=10) < now):
+        if (not db_layer.all_pairs_cached_time) or (db_layer.all_pairs_cached_time +
+                                                    datetime.timedelta(minutes=10) < now):
             # обновить список пар в кеше
-            app.db_layer.all_pairs_cached = [pair for pair in app.db_layer.db_pairs.collection_names()]
-            app.db_layer.all_pairs_cached_time = datetime.datetime.now()
+            db_layer.all_pairs_cached = [pair for pair in db_layer.db_pairs.collection_names()]
+            db_layer.all_pairs_cached_time = now
 
         # Проверяем что такая пара есть
-        if pair not in app.db_layer.all_pairs_cached:
-            return Response({
+        if pair not in db_layer.all_pairs_cached:
+            return web.json_response({
                 'message': f'Нет данных для такой пары: {pair}'
             }, status=400)
 
         # сначала ищем в кеше и проверяем кто кеш свежий
-        if pair not in app.db_layer.cache:
+        if pair not in db_layer.cache:
             cache_pair(now, pair)
 
-        # возвращем из кеша всегда
-        cached_time, cached_price = app.db_layer.cache[pair]
-        if cached_time + datetime.timedelta(minutes=1) < now:
+        cached_time, cached_price = db_layer.cache[pair]
+        if cached_time + datetime.timedelta(seconds=60) < now:
             # кеш устарел - кешируем заново
             cache_pair(now, pair)
-        else:
-            # возвращаем из кеша
-            return Response({
-                'average': str(cached_price),
-            }, status=200)
+        # возвращем из кеша всегда
+        return web.json_response({
+            'average': str(cached_price),
+        })
     except Exception as ex:
-        return Response({
+        return web.json_response({
             'message': f'Ошибка при получении курса для пары {pair}: {ex}'
         }, status=500)
 
@@ -83,20 +70,19 @@ def get_ticker(pair: str = None) -> Response:
 def cache_pair(now, pair):
     # получаем цену, кешим
     time_condition = {'$gte': now - datetime.timedelta(minutes=10), '$lt': now}
-    average = app.db_layer.db_pairs[pair].aggregate([
+    average = db_layer.db_pairs[pair].aggregate([
         {"$match": {"time": time_condition}},
         {"$group": {"_id": None, "average_price": {"$avg": "$value"}}}
     ])
     average_price = list(average)[0]['average_price']
-    app.db_layer.cache[pair] = (now, average_price)
+    db_layer.cache[pair] = (now, average_price)
 
 
-routes = [
-    Include('/docs', docs_urls),
-    Route('/ticker', 'GET', get_ticker),
-    Include('/static', static_urls)
-]
-app = MyApiApp(routes=routes)
+app = web.Application()
+app.add_routes([
+    web.get('/ticker/{pair}', get_ticker),
+])
+db_layer = DatabaseLayer('mongodb', database_name='pairs')
 
 if __name__ == '__main__':
-    app.main()
+    web.run_app(app)

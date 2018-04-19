@@ -2,7 +2,7 @@ from locust import HttpLocust, TaskSet
 
 
 def get_price(l):
-    l.client.get("/ticker?pair=btc_usd")
+    l.client.get("/ticker/btc_usd")
 
 
 class UserBehavior(TaskSet):
